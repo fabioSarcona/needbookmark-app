@@ -26,13 +26,17 @@ const BookmarkSchema = z.object({
 
 app.post('/api/metadata', async (req, res) => {
   try {
-    const { url } = BookmarkSchema.parse(req.body);
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { url } = BookmarkSchema.parse(body);
     
     // Fetch metadata
     const response = await fetch(url, { 
       headers: { 
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' 
-      } 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(8000) // 8 second timeout
     });
     
     if (!response.ok) {
@@ -69,9 +73,9 @@ app.post('/api/metadata', async (req, res) => {
       favicon,
       domain: new URL(url).hostname,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching metadata:', error);
-    res.status(400).json({ error: 'Errore durante il recupero dei metadati. Verifica l\'URL.' });
+    res.status(400).json({ error: `Errore durante il recupero dei metadati. Dettagli: ${error.message || String(error)}` });
   }
 });
 
