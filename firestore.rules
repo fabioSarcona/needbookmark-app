@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users/{userId}/bookmarks
+    // Document ID: auto-generated or timestamp
+    // Fields:
+    //   - id: string (required) - Unique identifier
+    //   - url: string (required) - The URL
+    //   - title: string (required) - The title of the webpage
+    //   - description: string (optional) - A brief description
+    //   - image: string (optional) - URL of the preview image
+    //   - favicon: string (optional) - URL of the website's favicon
+    //   - domain: string (required) - The domain name
+    //   - createdAt: string (required) - ISO 8601 date string
+    //   - isFavorite: boolean (optional) - Whether it's a favorite
+    //   - userId: string (required) - The owner's ID
+    //   - tags: list of strings (optional) - Tags for categorization
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function uidUnchanged() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function isValidTags(data) {
+      return !('tags' in data) || (data.tags is list && data.tags.size() <= 20);
+    }
+
+    function isValidBookmark(data) {
+      return hasRequiredFields(['id', 'url', 'title', 'domain', 'createdAt', 'userId']) &&
+             validStringLength('id', 1, 100) &&
+             validStringLength('url', 1, 2048) &&
+             validStringLength('title', 0, 500) &&
+             validStringLength('domain', 1, 255) &&
+             isValidDateString(data.createdAt) &&
+             isValidOptionalString('description', 0, 2048) &&
+             isValidOptionalString('image', 0, 2048) &&
+             isValidOptionalString('favicon', 0, 2048) &&
+             (!( 'isFavorite' in data ) || data.isFavorite is bool) &&
+             isValidTags(data);
+    }
+
+    match /users/{userId}/bookmarks/{bookmarkId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidBookmark(request.resource.data) && uidUnchanged();
+      allow update: if isOwner(userId) && isValidBookmark(request.resource.data) && uidNotModified();
+      allow delete: if isOwner(userId);
+    }
+  }
+}

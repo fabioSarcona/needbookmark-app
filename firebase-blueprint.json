@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "A saved web link with metadata.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the bookmark."
+        },
+        "url": {
+          "type": "string",
+          "description": "The URL of the saved link."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the webpage."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the webpage."
+        },
+        "image": {
+          "type": "string",
+          "description": "URL of the preview image."
+        },
+        "favicon": {
+          "type": "string",
+          "description": "URL of the website's favicon."
+        },
+        "domain": {
+          "type": "string",
+          "description": "The domain name of the URL."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date and time the bookmark was created."
+        },
+        "isFavorite": {
+          "type": "boolean",
+          "description": "Whether the bookmark is marked as a favorite."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who owns the bookmark."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of tags for categorization."
+        }
+      },
+      "required": ["id", "url", "title", "domain", "createdAt", "userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/bookmarks/{bookmarkId}": {
+      "schema": {
+        "$ref": "#/entities/Bookmark"
+      },
+      "description": "Bookmarks owned by a specific user."
+    }
+  }
+}
