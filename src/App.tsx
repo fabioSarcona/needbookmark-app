@@ -13,6 +13,7 @@ import { Input } from "./components/ui/input";
 import { Button } from "./components/ui/button";
 import { cn } from "./lib/utils";
 import { Bookmark } from "./types";
+import { getTagColor } from "./lib/tags";
 
 // Firebase imports
 import { User, onAuthStateChanged } from "firebase/auth";
@@ -37,6 +38,7 @@ export default function App() {
   
   // UI State
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('date_desc');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [columns, setColumns] = useState<number>(4);
@@ -85,7 +87,7 @@ export default function App() {
     return () => unsubscribe();
   }, [user, isAuthReady]);
 
-  const handleAddBookmark = async (url: string) => {
+  const handleAddBookmark = async (url: string, tags: string[]) => {
     if (!user) {
       setErrorMsg("You must be logged in to add bookmarks.");
       return;
@@ -107,7 +109,8 @@ export default function App() {
         domain: metadata.domain,
         createdAt: new Date().toISOString(),
         userId: user.uid,
-        isFavorite: false
+        isFavorite: false,
+        tags: tags
       };
 
       // Save to Firestore
@@ -169,13 +172,17 @@ export default function App() {
     setSelectedIds(newSelected);
   };
 
-  const { favoriteBookmarks, otherBookmarks } = useMemo(() => {
+  const { favoriteBookmarks, otherBookmarks, allTags } = useMemo(() => {
     const query = searchQuery.toLowerCase();
     let result = bookmarks.filter(b => 
       (b.title || "").toLowerCase().includes(query) ||
       (b.domain || "").toLowerCase().includes(query) ||
       (b.description || "").toLowerCase().includes(query)
     );
+
+    if (selectedTagFilter) {
+      result = result.filter(b => b.tags?.includes(selectedTagFilter));
+    }
 
     result.sort((a, b) => {
       if (sortBy === 'date_desc') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -189,8 +196,17 @@ export default function App() {
     const favorites = result.filter(b => b.isFavorite);
     const others = result.filter(b => !b.isFavorite);
 
-    return { favoriteBookmarks: favorites, otherBookmarks: others };
-  }, [bookmarks, searchQuery, sortBy]);
+    // Extract all unique tags
+    const tagsSet = new Set<string>();
+    bookmarks.forEach(b => {
+      if (b.tags) {
+        b.tags.forEach(t => tagsSet.add(t));
+      }
+    });
+    const tags = Array.from(tagsSet).sort();
+
+    return { favoriteBookmarks: favorites, otherBookmarks: others, allTags: tags };
+  }, [bookmarks, searchQuery, sortBy, selectedTagFilter]);
 
   if (!isAuthReady || !firebaseReady) {
     return (
@@ -363,80 +379,119 @@ export default function App() {
               <div className="flex h-64 items-center justify-center">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/10 border-t-white" />
               </div>
-            ) : (favoriteBookmarks.length > 0 || otherBookmarks.length > 0) ? (
+            ) : (
               <div className="space-y-12">
-                {favoriteBookmarks.length > 0 && (
-                  <div>
-                    <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-yellow-500"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-                      Favorites
-                    </h3>
-                    <motion.div 
-                      layout
+                {/* Tag Filter */}
+                {allTags.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 max-w-4xl mx-auto lg:max-w-none">
+                    <span className="text-sm text-zinc-500 mr-2">Filter by tag:</span>
+                    <button
+                      onClick={() => setSelectedTagFilter(null)}
                       className={cn(
-                        "gap-6",
-                        viewMode === 'grid' ? "dynamic-grid" : "grid grid-cols-1 max-w-4xl mx-auto"
+                        "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
+                        selectedTagFilter === null 
+                          ? "bg-white text-black" 
+                          : "bg-zinc-900/50 text-zinc-400 border border-white/10 hover:bg-zinc-800 hover:text-zinc-300"
                       )}
                     >
-                      <AnimatePresence mode="popLayout">
-                        {favoriteBookmarks.map((bookmark) => (
-                          <BookmarkCard 
-                            key={bookmark.id} 
-                            bookmark={bookmark} 
-                            onDelete={handleDeleteBookmark} 
-                            onToggleFavorite={handleToggleFavorite}
-                            isSelected={selectedIds.has(bookmark.id)}
-                            onSelect={handleSelect}
-                            viewMode={viewMode}
-                          />
-                        ))}
-                      </AnimatePresence>
-                    </motion.div>
+                      All
+                    </button>
+                    {allTags.map(tag => {
+                      const colorClass = getTagColor(tag);
+                      return (
+                        <button
+                          key={tag}
+                          onClick={() => setSelectedTagFilter(tag === selectedTagFilter ? null : tag)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                            selectedTagFilter === tag 
+                              ? colorClass
+                              : "bg-zinc-900/50 text-zinc-400 border-white/10 hover:bg-zinc-800 hover:text-zinc-300"
+                          )}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
-                {otherBookmarks.length > 0 && (
-                  <div>
+                {(favoriteBookmarks.length > 0 || otherBookmarks.length > 0) ? (
+                  <>
                     {favoriteBookmarks.length > 0 && (
-                      <h3 className="text-xl font-semibold text-white mb-6">All Bookmarks</h3>
+                      <div>
+                        <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-yellow-500"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                          Favorites
+                        </h3>
+                        <motion.div 
+                          layout
+                          className={cn(
+                            "gap-6",
+                            viewMode === 'grid' ? "dynamic-grid" : "grid grid-cols-1 max-w-4xl mx-auto"
+                          )}
+                        >
+                          <AnimatePresence mode="popLayout">
+                            {favoriteBookmarks.map((bookmark) => (
+                              <BookmarkCard 
+                                key={bookmark.id} 
+                                bookmark={bookmark} 
+                                onDelete={handleDeleteBookmark} 
+                                onToggleFavorite={handleToggleFavorite}
+                                isSelected={selectedIds.has(bookmark.id)}
+                                onSelect={handleSelect}
+                                viewMode={viewMode}
+                              />
+                            ))}
+                          </AnimatePresence>
+                        </motion.div>
+                      </div>
                     )}
-                    <motion.div 
-                      layout
-                      className={cn(
-                        "gap-6",
-                        viewMode === 'grid' ? "dynamic-grid" : "grid grid-cols-1 max-w-4xl mx-auto"
-                      )}
-                    >
-                      <AnimatePresence mode="popLayout">
-                        {otherBookmarks.map((bookmark) => (
-                          <BookmarkCard 
-                            key={bookmark.id} 
-                            bookmark={bookmark} 
-                            onDelete={handleDeleteBookmark} 
-                            onToggleFavorite={handleToggleFavorite}
-                            isSelected={selectedIds.has(bookmark.id)}
-                            onSelect={handleSelect}
-                            viewMode={viewMode}
-                          />
-                        ))}
-                      </AnimatePresence>
-                    </motion.div>
+
+                    {otherBookmarks.length > 0 && (
+                      <div>
+                        {favoriteBookmarks.length > 0 && (
+                          <h3 className="text-xl font-semibold text-white mb-6">All Bookmarks</h3>
+                        )}
+                        <motion.div 
+                          layout
+                          className={cn(
+                            "gap-6",
+                            viewMode === 'grid' ? "dynamic-grid" : "grid grid-cols-1 max-w-4xl mx-auto"
+                          )}
+                        >
+                          <AnimatePresence mode="popLayout">
+                            {otherBookmarks.map((bookmark) => (
+                              <BookmarkCard 
+                                key={bookmark.id} 
+                                bookmark={bookmark} 
+                                onDelete={handleDeleteBookmark} 
+                                onToggleFavorite={handleToggleFavorite}
+                                isSelected={selectedIds.has(bookmark.id)}
+                                onSelect={handleSelect}
+                                viewMode={viewMode}
+                              />
+                            ))}
+                          </AnimatePresence>
+                        </motion.div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] py-24 text-center max-w-4xl mx-auto backdrop-blur-sm">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/5 border border-white/10">
+                      <BookmarkIcon className="h-8 w-8 text-zinc-500" />
+                    </div>
+                    <h3 className="text-lg font-medium text-white">
+                      {searchQuery || selectedTagFilter ? "No results found" : "No bookmarks yet"}
+                    </h3>
+                    <p className="mt-2 max-w-sm text-sm text-zinc-400">
+                      {searchQuery || selectedTagFilter
+                        ? "Try adjusting your search terms or filters."
+                        : "Start by adding your first link using the input bar above."}
+                    </p>
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] py-24 text-center max-w-4xl mx-auto backdrop-blur-sm">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/5 border border-white/10">
-                  <BookmarkIcon className="h-8 w-8 text-zinc-500" />
-                </div>
-                <h3 className="text-lg font-medium text-white">
-                  {searchQuery ? "No results found" : "No bookmarks yet"}
-                </h3>
-                <p className="mt-2 max-w-sm text-sm text-zinc-400">
-                  {searchQuery 
-                    ? "Try adjusting your search terms."
-                    : "Start by adding your first link using the input bar above."}
-                </p>
               </div>
             )}
           </>

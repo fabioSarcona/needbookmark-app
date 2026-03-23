@@ -9,4 +9,5 @@ export interface Bookmark {
   createdAt: string;
   isFavorite?: boolean;
   userId: string;
+  tags?: string[];
 }

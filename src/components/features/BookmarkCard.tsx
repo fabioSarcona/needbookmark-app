@@ -5,6 +5,7 @@ import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { motion } from "motion/react";
 import { cn } from "@/src/lib/utils";
+import { getTagColor } from "@/src/lib/tags";
 
 const gradients = [
   "bg-gradient-to-r from-pink-500 to-rose-500",
@@ -110,6 +111,21 @@ export function BookmarkCard({
                 {bookmark.domain}
               </span>
             </div>
+            {bookmark.tags && bookmark.tags.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                {bookmark.tags.map(tag => {
+                  const colorClass = getTagColor(tag);
+                  return (
+                    <span 
+                      key={tag} 
+                      className={cn("px-2 py-0.5 text-[10px] font-medium rounded-full border", colorClass)}
+                    >
+                      {tag}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </a>
         
@@ -187,6 +203,21 @@ export function BookmarkCard({
           <p className="mt-2 line-clamp-2 text-xs text-zinc-500">
             {bookmark.description || "No description available."}
           </p>
+          {bookmark.tags && bookmark.tags.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+              {bookmark.tags.map(tag => {
+                const colorClass = getTagColor(tag);
+                return (
+                  <span 
+                    key={tag} 
+                    className={cn("px-2 py-0.5 text-[10px] font-medium rounded-full border", colorClass)}
+                  >
+                    {tag}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
       </a>
       
