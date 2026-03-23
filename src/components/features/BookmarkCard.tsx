@@ -1,17 +1,38 @@
-import React from "react";
+import React, { useState } from "react";
 import { Bookmark } from "@/src/types";
-import { Trash2, ExternalLink, Star, Pencil } from "lucide-react";
+import { Trash2, ExternalLink, Star } from "lucide-react";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { motion } from "motion/react";
 import { cn } from "@/src/lib/utils";
+
+const gradients = [
+  "bg-gradient-to-r from-pink-500 to-rose-500",
+  "bg-gradient-to-r from-purple-500 to-indigo-500",
+  "bg-gradient-to-r from-blue-500 to-cyan-500",
+  "bg-gradient-to-r from-teal-500 to-emerald-500",
+  "bg-gradient-to-r from-orange-500 to-amber-500",
+  "bg-gradient-to-r from-red-500 to-orange-500",
+  "bg-gradient-to-r from-fuchsia-500 to-purple-500",
+  "bg-gradient-to-r from-violet-500 to-fuchsia-500",
+  "bg-gradient-to-r from-cyan-500 to-blue-500",
+  "bg-gradient-to-r from-emerald-500 to-teal-500",
+];
+
+function getGradient(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % gradients.length;
+  return gradients[index];
+}
 
 interface BookmarkCardProps {
   key?: string;
   bookmark: Bookmark;
   onDelete: (id: string) => void;
   onToggleFavorite: (id: string, isFavorite: boolean) => void;
-  onEdit: (bookmark: Bookmark) => void;
   isSelected: boolean;
   onSelect: (id: string, selected: boolean) => void;
   viewMode: 'grid' | 'list';
@@ -21,11 +42,13 @@ export function BookmarkCard({
   bookmark, 
   onDelete, 
   onToggleFavorite,
-  onEdit,
   isSelected,
   onSelect,
   viewMode 
 }: BookmarkCardProps) {
+  const [imageError, setImageError] = useState(false);
+  const hasImage = bookmark.image && !imageError;
+  const gradientClass = getGradient(bookmark.id);
   
   if (viewMode === 'list') {
     return (
@@ -57,23 +80,21 @@ export function BookmarkCard({
           </button>
         </div>
 
-        <a href={bookmark.url} target="_blank" rel="noopener noreferrer" className="flex flex-1 items-center gap-4 min-w-0">
-          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-zinc-900 border border-white/5">
-            {bookmark.image ? (
+        {!hasImage && (
+          <div className={cn("absolute top-0 left-0 right-0 h-[6px]", gradientClass)} />
+        )}
+        <a href={bookmark.url} target="_blank" rel="noopener noreferrer" className={cn("flex flex-1 items-center gap-4 min-w-0", !hasImage && "pt-1")}>
+          {hasImage && (
+            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-zinc-900 border border-white/5">
               <img 
                 src={bookmark.image} 
                 alt={bookmark.title} 
                 className="h-full w-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
                 referrerPolicy="no-referrer"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                  (e.target as HTMLImageElement).parentElement!.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
-                }}
+                onError={() => setImageError(true)}
               />
-            ) : (
-              <div className="h-full w-full bg-gradient-to-br from-zinc-800 to-zinc-950" />
-            )}
-          </div>
+            </div>
+          )}
           
           <div className="flex flex-1 flex-col min-w-0">
             <h3 className="truncate text-base font-medium text-zinc-100">
@@ -88,38 +109,11 @@ export function BookmarkCard({
               <span className="truncate text-xs font-medium text-zinc-400">
                 {bookmark.domain}
               </span>
-              {bookmark.tags && bookmark.tags.length > 0 && (
-                <>
-                  <span className="text-zinc-600 text-xs">•</span>
-                  <div className="flex items-center gap-1 overflow-hidden">
-                    {bookmark.tags.slice(0, 3).map(tag => (
-                      <span key={tag} className="truncate rounded-md bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300 border border-white/5">
-                        #{tag}
-                      </span>
-                    ))}
-                    {bookmark.tags.length > 3 && (
-                      <span className="text-[10px] text-zinc-500">+{bookmark.tags.length - 3}</span>
-                    )}
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </a>
         
         <div className="flex items-center gap-2 pr-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-zinc-500 opacity-0 transition-opacity hover:text-blue-400 hover:bg-blue-500/10 group-hover:opacity-100"
-            onClick={(e) => {
-              e.preventDefault();
-              onEdit(bookmark);
-            }}
-            title="Edit bookmark"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
           <Button 
             variant="ghost" 
             size="icon" 
@@ -149,6 +143,9 @@ export function BookmarkCard({
         isSelected ? "border-white/40 ring-1 ring-white/20" : "border-white/10 hover:border-white/20"
       )}
     >
+      {!hasImage && (
+        <div className={cn("absolute top-0 left-0 right-0 h-[6px] z-20", gradientClass)} />
+      )}
       <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
         <Checkbox 
           checked={isSelected}
@@ -172,41 +169,24 @@ export function BookmarkCard({
       </div>
 
       <a href={bookmark.url} target="_blank" rel="noopener noreferrer" className="flex-1 flex flex-col">
-        <div className="aspect-[1.91/1] w-full overflow-hidden bg-zinc-900 border-b border-white/5">
-          {bookmark.image ? (
+        {hasImage && (
+          <div className="aspect-[1.91/1] w-full overflow-hidden bg-zinc-900 border-b border-white/5">
             <img 
               src={bookmark.image} 
               alt={bookmark.title} 
               className="h-full w-full object-cover opacity-80 transition-all duration-500 group-hover:scale-105 group-hover:opacity-100"
               referrerPolicy="no-referrer"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-                (e.target as HTMLImageElement).parentElement!.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
-              }}
+              onError={() => setImageError(true)}
             />
-          ) : (
-            <div className="h-full w-full bg-gradient-to-br from-zinc-800 to-zinc-950" />
-          )}
-        </div>
-        <div className="flex flex-1 flex-col p-4">
+          </div>
+        )}
+        <div className={cn("flex flex-1 flex-col p-4", !hasImage && "pt-12")}>
           <h3 className="line-clamp-2 text-sm font-medium leading-tight text-zinc-100 group-hover:text-white transition-colors">
             {bookmark.title}
           </h3>
           <p className="mt-2 line-clamp-2 text-xs text-zinc-500">
             {bookmark.description || "No description available."}
           </p>
-          {bookmark.tags && bookmark.tags.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5 overflow-hidden">
-              {bookmark.tags.slice(0, 3).map(tag => (
-                <span key={tag} className="truncate rounded-md bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300 border border-white/5">
-                  #{tag}
-                </span>
-              ))}
-              {bookmark.tags.length > 3 && (
-                <span className="text-[10px] text-zinc-500">+{bookmark.tags.length - 3}</span>
-              )}
-            </div>
-          )}
         </div>
       </a>
       
@@ -222,32 +202,18 @@ export function BookmarkCard({
           </span>
         </div>
         
-        <div className="flex items-center gap-1">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-zinc-500 opacity-0 transition-opacity hover:text-blue-400 hover:bg-blue-500/10 group-hover:opacity-100"
-            onClick={(e) => {
-              e.preventDefault();
-              onEdit(bookmark);
-            }}
-            title="Edit bookmark"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-zinc-500 opacity-0 transition-opacity hover:text-red-400 hover:bg-red-500/10 group-hover:opacity-100"
-            onClick={(e) => {
-              e.preventDefault();
-              onDelete(bookmark.id);
-            }}
-            title="Delete bookmark"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8 text-zinc-500 opacity-0 transition-opacity hover:text-red-400 hover:bg-red-500/10 group-hover:opacity-100"
+          onClick={(e) => {
+            e.preventDefault();
+            onDelete(bookmark.id);
+          }}
+          title="Delete bookmark"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
     </motion.div>
   );

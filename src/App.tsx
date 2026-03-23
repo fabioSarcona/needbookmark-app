@@ -169,7 +169,7 @@ export default function App() {
     setSelectedIds(newSelected);
   };
 
-  const filteredAndSortedBookmarks = useMemo(() => {
+  const { favoriteBookmarks, otherBookmarks } = useMemo(() => {
     const query = searchQuery.toLowerCase();
     let result = bookmarks.filter(b => 
       (b.title || "").toLowerCase().includes(query) ||
@@ -178,11 +178,6 @@ export default function App() {
     );
 
     result.sort((a, b) => {
-      // Favorites always on top
-      if (a.isFavorite && !b.isFavorite) return -1;
-      if (!a.isFavorite && b.isFavorite) return 1;
-
-      // Then apply selected sort
       if (sortBy === 'date_desc') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       if (sortBy === 'date_asc') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       if (sortBy === 'title_asc') return a.title.localeCompare(b.title);
@@ -191,7 +186,10 @@ export default function App() {
       return 0;
     });
 
-    return result;
+    const favorites = result.filter(b => b.isFavorite);
+    const others = result.filter(b => !b.isFavorite);
+
+    return { favoriteBookmarks: favorites, otherBookmarks: others };
   }, [bookmarks, searchQuery, sortBy]);
 
   if (!isAuthReady || !firebaseReady) {
@@ -203,7 +201,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen bg-black font-sans text-zinc-100 pb-24 relative overflow-y-auto flex flex-col">
+    <div className="h-screen bg-black font-sans text-zinc-100 relative flex flex-col overflow-hidden">
       {/* Background Glow Effects */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px]"></div>
@@ -232,7 +230,7 @@ export default function App() {
       `}</style>
 
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-black/50 px-6 py-4 backdrop-blur-xl">
+      <header className="shrink-0 z-30 border-b border-white/10 bg-black/50 px-6 py-4 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black shadow-sm">
@@ -315,9 +313,10 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] w-full px-6 py-16 flex-1 relative z-10">
-        {/* Hero Section */}
-        <div className="mb-16 flex flex-col items-center text-center">
+      <main className="flex-1 overflow-y-auto w-full relative z-10">
+        <div className="mx-auto max-w-[1600px] px-6 py-16">
+          {/* Hero Section */}
+          <div className="mb-16 flex flex-col items-center text-center">
           <h2 className="mb-6 text-4xl font-semibold tracking-tight text-white sm:text-6xl">
             Organize your digital <br />
             <span className="text-zinc-500">workspace with ease.</span>
@@ -364,28 +363,67 @@ export default function App() {
               <div className="flex h-64 items-center justify-center">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/10 border-t-white" />
               </div>
-            ) : filteredAndSortedBookmarks.length > 0 ? (
-              <motion.div 
-                layout
-                className={cn(
-                  "gap-6",
-                  viewMode === 'grid' ? "dynamic-grid" : "grid grid-cols-1 max-w-4xl mx-auto"
+            ) : (favoriteBookmarks.length > 0 || otherBookmarks.length > 0) ? (
+              <div className="space-y-12">
+                {favoriteBookmarks.length > 0 && (
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-yellow-500"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                      Favorites
+                    </h3>
+                    <motion.div 
+                      layout
+                      className={cn(
+                        "gap-6",
+                        viewMode === 'grid' ? "dynamic-grid" : "grid grid-cols-1 max-w-4xl mx-auto"
+                      )}
+                    >
+                      <AnimatePresence mode="popLayout">
+                        {favoriteBookmarks.map((bookmark) => (
+                          <BookmarkCard 
+                            key={bookmark.id} 
+                            bookmark={bookmark} 
+                            onDelete={handleDeleteBookmark} 
+                            onToggleFavorite={handleToggleFavorite}
+                            isSelected={selectedIds.has(bookmark.id)}
+                            onSelect={handleSelect}
+                            viewMode={viewMode}
+                          />
+                        ))}
+                      </AnimatePresence>
+                    </motion.div>
+                  </div>
                 )}
-              >
-                <AnimatePresence mode="popLayout">
-                  {filteredAndSortedBookmarks.map((bookmark) => (
-                    <BookmarkCard 
-                      key={bookmark.id} 
-                      bookmark={bookmark} 
-                      onDelete={handleDeleteBookmark} 
-                      onToggleFavorite={handleToggleFavorite}
-                      isSelected={selectedIds.has(bookmark.id)}
-                      onSelect={handleSelect}
-                      viewMode={viewMode}
-                    />
-                  ))}
-                </AnimatePresence>
-              </motion.div>
+
+                {otherBookmarks.length > 0 && (
+                  <div>
+                    {favoriteBookmarks.length > 0 && (
+                      <h3 className="text-xl font-semibold text-white mb-6">All Bookmarks</h3>
+                    )}
+                    <motion.div 
+                      layout
+                      className={cn(
+                        "gap-6",
+                        viewMode === 'grid' ? "dynamic-grid" : "grid grid-cols-1 max-w-4xl mx-auto"
+                      )}
+                    >
+                      <AnimatePresence mode="popLayout">
+                        {otherBookmarks.map((bookmark) => (
+                          <BookmarkCard 
+                            key={bookmark.id} 
+                            bookmark={bookmark} 
+                            onDelete={handleDeleteBookmark} 
+                            onToggleFavorite={handleToggleFavorite}
+                            isSelected={selectedIds.has(bookmark.id)}
+                            onSelect={handleSelect}
+                            viewMode={viewMode}
+                          />
+                        ))}
+                      </AnimatePresence>
+                    </motion.div>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] py-24 text-center max-w-4xl mx-auto backdrop-blur-sm">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/5 border border-white/10">
@@ -403,10 +441,11 @@ export default function App() {
             )}
           </>
         )}
+        </div>
       </main>
 
       {/* Minimal Footer */}
-      <footer className="border-t border-white/10 bg-black/50 backdrop-blur-md py-8 mt-auto relative z-10">
+      <footer className="shrink-0 border-t border-white/10 bg-black/50 backdrop-blur-md py-6 relative z-10">
         <div className="mx-auto max-w-[1600px] px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-zinc-500"><path d="M4 4v16a2 2 0 0 0 3 1.5l5-2.5 5 2.5A2 2 0 0 0 20 20V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"/></svg>
