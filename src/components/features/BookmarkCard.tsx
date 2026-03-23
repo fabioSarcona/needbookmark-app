@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Bookmark } from "@/src/types";
-import { Trash2, ExternalLink, Star } from "lucide-react";
+import { Trash2, ExternalLink, Star, Tag, X, Check } from "lucide-react";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
+import { Input } from "../ui/input";
 import { motion } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { getTagColor } from "@/src/lib/tags";
@@ -34,6 +35,7 @@ interface BookmarkCardProps {
   bookmark: Bookmark;
   onDelete: (id: string) => void;
   onToggleFavorite: (id: string, isFavorite: boolean) => void;
+  onUpdateTags: (id: string, tags: string[]) => void;
   isSelected: boolean;
   onSelect: (id: string, selected: boolean) => void;
   viewMode: 'grid' | 'list';
@@ -43,14 +45,112 @@ export function BookmarkCard({
   bookmark, 
   onDelete, 
   onToggleFavorite,
+  onUpdateTags,
   isSelected,
   onSelect,
   viewMode 
 }: BookmarkCardProps) {
   const [imageError, setImageError] = useState(false);
+  const [isEditingTags, setIsEditingTags] = useState(false);
+  const [editTags, setEditTags] = useState<string[]>(bookmark.tags || []);
+  const [customTag, setCustomTag] = useState("");
+
   const hasImage = bookmark.image && !imageError;
   const gradientClass = getGradient(bookmark.id);
-  
+
+  const handleSaveTags = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onUpdateTags(bookmark.id, editTags);
+    setIsEditingTags(false);
+  };
+
+  const handleCancelTags = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsEditingTags(false);
+    setEditTags(bookmark.tags || []);
+    setCustomTag("");
+  };
+
+  const handleRemoveTag = (e: React.MouseEvent, tagToRemove: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditTags(editTags.filter(t => t !== tagToRemove));
+  };
+
+  const handleAddCustomTag = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && customTag.trim()) {
+      e.preventDefault();
+      e.stopPropagation();
+      const newTag = customTag.trim();
+      if (!editTags.includes(newTag)) {
+        setEditTags([...editTags, newTag]);
+      }
+      setCustomTag("");
+    }
+  };
+
+  const renderTags = () => {
+    if (isEditingTags) {
+      return (
+        <div 
+          className="flex flex-col gap-2 mt-2 w-full"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        >
+          <div className="flex flex-wrap gap-1.5">
+            {editTags.map(tag => {
+              const colorClass = getTagColor(tag);
+              return (
+                <span key={tag} className={cn("px-2 py-0.5 text-[10px] font-medium rounded-full border flex items-center gap-1", colorClass)}>
+                  {tag}
+                  <button type="button" onClick={(e) => handleRemoveTag(e, tag)} className="hover:bg-black/20 rounded-full p-0.5 transition-colors">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2">
+            <Input 
+              value={customTag}
+              onChange={e => setCustomTag(e.target.value)}
+              onKeyDown={handleAddCustomTag}
+              placeholder="Add tag & press Enter"
+              className="h-7 text-xs bg-black/40 border-white/10 focus-visible:ring-white/20"
+            />
+            <Button type="button" size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-green-400 hover:bg-green-500/20" onClick={handleSaveTags}>
+              <Check className="h-4 w-4" />
+            </Button>
+            <Button type="button" size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-zinc-400 hover:bg-white/10" onClick={handleCancelTags}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (bookmark.tags && bookmark.tags.length > 0) {
+      return (
+        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+          {bookmark.tags.map(tag => {
+            const colorClass = getTagColor(tag);
+            return (
+              <span 
+                key={tag} 
+                className={cn("px-2 py-0.5 text-[10px] font-medium rounded-full border", colorClass)}
+              >
+                {tag}
+              </span>
+            );
+          })}
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   if (viewMode === 'list') {
     return (
       <motion.div 
@@ -111,25 +211,23 @@ export function BookmarkCard({
                 {bookmark.domain}
               </span>
             </div>
-            {bookmark.tags && bookmark.tags.length > 0 && (
-              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                {bookmark.tags.map(tag => {
-                  const colorClass = getTagColor(tag);
-                  return (
-                    <span 
-                      key={tag} 
-                      className={cn("px-2 py-0.5 text-[10px] font-medium rounded-full border", colorClass)}
-                    >
-                      {tag}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
+            {renderTags()}
           </div>
         </a>
         
-        <div className="flex items-center gap-2 pr-2">
+        <div className="flex items-center gap-1 pr-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-zinc-500 opacity-0 transition-opacity hover:text-white hover:bg-white/10 group-hover:opacity-100"
+            onClick={(e) => {
+              e.preventDefault();
+              setIsEditingTags(true);
+            }}
+            title="Edit tags"
+          >
+            <Tag className="h-4 w-4" />
+          </Button>
           <Button 
             variant="ghost" 
             size="icon" 
@@ -203,21 +301,7 @@ export function BookmarkCard({
           <p className="mt-2 line-clamp-2 text-xs text-zinc-500">
             {bookmark.description || "No description available."}
           </p>
-          {bookmark.tags && bookmark.tags.length > 0 && (
-            <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-              {bookmark.tags.map(tag => {
-                const colorClass = getTagColor(tag);
-                return (
-                  <span 
-                    key={tag} 
-                    className={cn("px-2 py-0.5 text-[10px] font-medium rounded-full border", colorClass)}
-                  >
-                    {tag}
-                  </span>
-                );
-              })}
-            </div>
-          )}
+          {renderTags()}
         </div>
       </a>
       
@@ -233,18 +317,32 @@ export function BookmarkCard({
           </span>
         </div>
         
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8 text-zinc-500 opacity-0 transition-opacity hover:text-red-400 hover:bg-red-500/10 group-hover:opacity-100"
-          onClick={(e) => {
-            e.preventDefault();
-            onDelete(bookmark.id);
-          }}
-          title="Delete bookmark"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-zinc-500 opacity-0 transition-opacity hover:text-white hover:bg-white/10 group-hover:opacity-100"
+            onClick={(e) => {
+              e.preventDefault();
+              setIsEditingTags(true);
+            }}
+            title="Edit tags"
+          >
+            <Tag className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-zinc-500 opacity-0 transition-opacity hover:text-red-400 hover:bg-red-500/10 group-hover:opacity-100"
+            onClick={(e) => {
+              e.preventDefault();
+              onDelete(bookmark.id);
+            }}
+            title="Delete bookmark"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </motion.div>
   );

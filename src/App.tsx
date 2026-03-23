@@ -145,6 +145,15 @@ export default function App() {
     }
   };
 
+  const handleUpdateTags = async (id: string, tags: string[]) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, `users/${user.uid}/bookmarks`, id), { tags });
+    } catch (error) {
+      console.error("Error updating tags:", error);
+    }
+  };
+
   const handleBulkDelete = async () => {
     if (!user || selectedIds.size === 0) return;
     if (window.confirm(`Are you sure you want to delete ${selectedIds.size} bookmarks?`)) {
@@ -438,6 +447,7 @@ export default function App() {
                                 bookmark={bookmark} 
                                 onDelete={handleDeleteBookmark} 
                                 onToggleFavorite={handleToggleFavorite}
+                                onUpdateTags={handleUpdateTags}
                                 isSelected={selectedIds.has(bookmark.id)}
                                 onSelect={handleSelect}
                                 viewMode={viewMode}
@@ -467,6 +477,7 @@ export default function App() {
                                 bookmark={bookmark} 
                                 onDelete={handleDeleteBookmark} 
                                 onToggleFavorite={handleToggleFavorite}
+                                onUpdateTags={handleUpdateTags}
                                 isSelected={selectedIds.has(bookmark.id)}
                                 onSelect={handleSelect}
                                 viewMode={viewMode}
